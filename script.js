@@ -3,60 +3,82 @@ const cellSize = calculateCellSize(); // Lasketaan ruudun koko responsiivisesti
 let board; //Kenttä tallennetaan tähän
 let player; //muuttuja pelaajalle
 let ghosts = []; // Lista, johon tallennetaan kaikki ghost-oliot
+let isGameRunning = false; // Muuttuja kertoo, onko peli käynnissä vai ei
+let ghostInterval; // Muuttujaan tallennetaan haamujen liikkeen aikaväli
 let ghostSpeed = 1000; // Aloitusnopeus haamuille (millisekunteina)
+let score = 0; //Pistelaskuri
 
 
 // Haetaan nappi ja lisätään tapahtumankuuntelija
 document.getElementById('new-game-btn').addEventListener('click', startGame);
 
 
+function updateScoreBoard(points){
+
+
+    // Haetaan HTML-elementti, johon pisteet näytetään
+    const scoreBoard = document.getElementById('score-board');
+
+
+    // Lisätään saatu pistemäärä (points) olemassa oleviin pisteisiin
+    score = score + points;
+
+
+    // Näytetään päivitetty pistemäärä ruudulla muodossa "Pisteet: 150"
+    scoreBoard.textContent = `Pisteet: ${score}`;
+}
+
+
 // Tapahtumankuuntelija, joka reagoi näppäimistön painalluksiin
 document.addEventListener('keydown', (event) => {
+    // Katsdtaan onko peli päällä
+    if (isGameRunning) {
 
 
-    switch (event.key){
+        switch (event.key){
 
 
-        // Tarkistetaan, mikä näppäin on painettu
-        case 'ArrowUp':
-            player.move(0, -1); // Liikuta pelaajaa yksi askel ylöspäin
-            break;
+            // Tarkistetaan, mikä näppäin on painettu
+            case 'ArrowUp':
+                player.move(0, -1); // Liikuta pelaajaa yksi askel ylöspäin
+                break;
 
 
-        case 'ArrowDown':
-            player.move(0, 1); //Liikuta pelaajaa yksi askel alaspäin
-            break;
+            case 'ArrowDown':
+                player.move(0, 1); //Liikuta pelaajaa yksi askel alaspäin
+                break;
 
 
-        case 'ArrowLeft':
-            player.move(-1, 0); //Liikuta pelaajaa yksi askel vasemmalle
-            break;
+            case 'ArrowLeft':
+                player.move(-1, 0); //Liikuta pelaajaa yksi askel vasemmalle
+                break;
 
 
-        case 'ArrowRight':
-            player.move(1, 0); // Liikuta pelaajaa yksi askel oikealle
-            break;
+            case 'ArrowRight':
+                player.move(1, 0); // Liikuta pelaajaa yksi askel oikealle
+                break;
 
 
-        case 'w':
-            shootAt(player.x, player.y -1); // Ammutaan ylöspäin
-            break;
-       
-        case 's':
-            shootAt(player.x, player.y + 1); // Ammutaan alaspain
-            break;
+            case 'w':
+                shootAt(player.x, player.y -1); // Ammutaan ylöspäin
+                break;
+           
+            case 's':
+                shootAt(player.x, player.y + 1); // Ammutaan alaspain
+                break;
 
 
-        case 'a':
-            shootAt(player.x - 1, player.y); // Ammutaan vasemmalle
-            break;
+            case 'a':
+                shootAt(player.x - 1, player.y); // Ammutaan vasemmalle
+                break;
 
 
-        case 'd':
-            shootAt(player.x + 1, player.y); // Ammutaan oikealle
+            case 'd':
+                shootAt(player.x + 1, player.y); // Ammutaan oikealle
 
 
-    }
+        }
+    }    
     event.preventDefault(); // Estetään selaimen oletustoiminnot, kuten sivun vieritys
 });
 
@@ -89,6 +111,10 @@ function startGame(){
     document.getElementById('game-screen').style.display = 'block';
 
 
+    // Merkitään peli käynnissä olevaksi
+    isGameRunning = true;
+
+
     //Luo uuden pelaajan ja sijoittaa sen koordinaatteihin (0,0)
     player = new Player(0, 0);
 
@@ -96,7 +122,17 @@ function startGame(){
     board = generateRandomBoard(); //Luo pelikenttä ja piirrä se
 
 
-    setInterval(moveGhosts, ghostSpeed);
+
+
+    setTimeout(() => {
+        ghostInterval = setInterval(moveGhosts, ghostSpeed);
+    }, 1000);
+
+
+    // Nollataan pisteet uuden pelin alussa
+    score = 0;
+    // Päivitetään pistetaulu näkymään ruudulle
+    updateScoreBoard(0);
 
 
     drawBoard(board); // Piirretään pelikenttä HTML:n
@@ -122,6 +158,10 @@ function generateRandomBoard(){
         }
     }
     generateObstacles(newBoard);
+
+
+    //Tyhjennetään ghost lista
+    ghosts = [];
 
 
     for (let i = 0; i < 5; i++){ //Luodaan 5 haamua
@@ -286,6 +326,40 @@ class Ghost {
         this.x = x;
         this.y = y;
     }
+    moveGhostTowardsPlayer(player, board, oldGhosts){ // Metodi joka liikuttaa haamua kohti pelaajaa
+        let dx = player.x - this.x; // Lasketaan x-suuntainen etäisyys pelaajaan
+        let dy = player.y - this.y; // Lasketaan y-suuntainen etäisyys pelaajaan
+
+
+        let moves = []; // Lista mahdollisista siirroista
+
+
+        if (Math.abs(dx) > Math.abs(dy)){
+            if (dx > 0) moves.push({ x: this.x + 1, y: this.y}); // Siirto oikealle
+            else moves.push({ x: this.x -1, y: this.y}); // Siirto vasemmalle
+            if (dy > 0) moves.push({ x: this.x, y: this.y + 1}); // Siirto alaspäin
+            else moves.push({ x: this.x, y: this.y - 1}); // Siirto ylöspäin
+        } else {
+            if (dy > 0) moves.push({ x: this.x, y: this.y + 1 }) // Siirto alaspäin
+            else moves.push({ x: this.x, y: this.y - 1}); // Siirto ylös
+            if (dx > 0) moves.push({ x: this.x + 1, y: this.y}); // Siirto oikealle
+            else moves.push({ x: this.x -1, y: this.y}); // Siirto vasemmalle
+        }
+
+
+        // Käydään läpi kaikki mahdolliset liikkeet
+        for (let move of moves) {
+            // Jos uusi ruutu on tyhjä tai siellä on pelaaja ja sinne ei ole jo menossa toinen haamu
+            if (
+                (board[move.y][move.x] === ' ' || board[move.y][move.x] === 'P') &&
+                !oldGhosts.some(h => h.x === move.x && h.y === move.y)
+            ) {
+                return move; // Palautetaan ensimmäinen sopiva liike
+            }
+        }
+        // Jos mikään liike ei onnistu, pysytään paikallaan
+        return { x: this.x, y: this.y };
+    }
 }
 
 
@@ -319,61 +393,109 @@ function shootAt(x, y) {
     // Tarkistetaan, onko kaikki haamut poistettu pelistä
     if (ghosts.length === 0){
         // Jos kaikki haamut on ammuttu, siirrytään seuraavalle tasolle
-        alert('kaikki ammuttu');
+        startNextLevel();
     }
 }
 
 
 function moveGhosts() {
-    // Tallennetaan kaikkien haamujen nykyiset sijainnit ennen kuin niitä liikutetaan
-    const oldGhosts = ghosts.map(ghost => ({ x: ghost.x, y: ghost.y}));
+    // Tallennetaan kaikkien haamujen nykyiset sijainnit (ennen siirtoa)
+    const oldGhosts = ghosts.map(ghost => ({ x: ghost.x, y: ghost.y }));
 
 
-    // Käydään jokainen haamu yksitellen läpi
+    // Käydään läpi jokainen haamu
     ghosts.forEach(ghost => {
+        // Lasketaan uusi sijainti, johon haamu haluaa liikkua
+        const newPosition = ghost.moveGhostTowardsPlayer(player, board, oldGhosts);
 
 
-        // Mahdolliset suunnat joihin haamu voi yrittää liikkua(ylös, alas, vasen, oikea)
-        const possibleNewPositions = [
-            { x: ghost.x, y: ghost.y - 1 }, // Ylös
-            { x: ghost.x, y: ghost.y + 1 }, //Alas
-            { x: ghost.x - 1, y: ghost.y }, // Vasen
-            { x: ghost.x + 1, y:ghost.y } // Oikea
-        ];
+        // Päivitetään haamun koordinaatit
+        ghost.x = newPosition.x;
+        ghost.y = newPosition.y;
 
 
-        // Poistetaan listalta suunnat, jotka menevät seinän tai kentän ulkopuolelle
-        const validNewPositions = possibleNewPositions.filter(newPosition =>
-            newPosition.x >= 0 && newPosition.x < BOARD_SIZE && //Ei mennä vasemmalta tai oikealta ulos kentästä
-            newPosition.y >= 0 && newPosition.y < BOARD_SIZE && // Ei mennä ylhäältä tai alhaalta ulos kentästä
-            board[newPosition.y][newPosition.x] === ' '         // Vain tyhjät ruudut kelpaavat
-        );
+        // Asetetaan uusi sijainti laudalle
+        setCell(board, ghost.x, ghost.y, 'H');
 
 
-        // Jos haamulle löytyi ainakin yksi tyhjä ruutu johon se voi mennä
-        if (validNewPositions.length > 0) {
-            // Valitaan satunnainen uusi ruutu listasta
-            const randomNewPosition = validNewPositions[Math.floor(Math.random() * validNewPositions.length)];
-
-
-            // Päivitetään haamun sijainti uuteen paikkaan
-            ghost.x = randomNewPosition.x;
-            ghost.y = randomNewPosition.y;
+        // Tarkistetaan törmääkö haamu pelaajaan
+        if ( ghost.x === player.x && ghost.y === player.y){
+            endGame(); // Peli päättyy jos haamu osuu pelaajaan
+            return;
         }
 
 
-        // Merkitään haamu uuteen paikkaan pelilaudalle (asetetaan 'H')
-        setCell(board, ghost.x, ghost.y, 'H');
+       
     });
 
 
-    // Kun kaikki haamut on siirretty, tyhjennetään vanhat haamujen paikat
+    // Tyhjennetään vanhat haamujen paikat laudalta (jotta niistä ei jää haamuja näkyviin)
     oldGhosts.forEach(ghost => {
-        board[ghost.y][ghost.x] = ' '; // Korvataan vanha haamusolu tyhjällä
+        board[ghost.y][ghost.x] = ' ';
     });
 
 
-    // Lopuksi piirretään uusi pelilauta näkyviin, jotta liike näkyy ruudulla
+    // Päivitetään uudet sijainnit laudalle (uudelleenvarmistus)
+    ghosts.forEach(ghost => {
+        board[ghost.y][ghost.x] = 'H';
+    });
+
+
+    // Piirretään kenttä uudestaan näytölle
     drawBoard(board);
+}
+
+
+function endGame(){
+
+
+    // Asetetaan peli päättyneeksi
+    isGameRunning = false;
+
+
+    // Näytetään ilmoitus pelaajalle, että peli on ohi
+    alert('Game Over! The ghost caught you!');
+
+
+    // Pysäytetään haamujen liike
+    clearInterval(ghostInterval);
+
+
+    // Näytetään aloitusnäkymä uudelleen (pelaaja voi aloittaa uuden pelin)
+    document.getElementById('intro-screen').style.display = 'block';
+
+
+    // Piilotetaan pelinäkymä, koska peli päättyi
+    document.getElementById('game-screen').style.display = 'none';
+}
+
+
+function startNextLevel() {
+
+
+    // Näytettään pelaajalle ilmoitus siitä, että uusi taso alkaa ja haamujen nopeus kasvaa
+    alert('Level UP! Haamujen nopeus kasvaa.')
+
+
+    // Luodaan uusi satunnainen pelikenttä, johon sijoitetaan pelaaja, haamut ja esteet
+    board = generateRandomBoard();
+
+
+    // Piirretään uusi pelikenttä ruudulle, jotta uudet aloitussijainnit tulevat näkyviin
+    drawBoard(board);
+
+
+    // Tehdään haamuista nopeampia
+    ghostSpeed = ghostSpeed * 0.9;
+
+    //Testi
+    // Lopetetaan vanha setInterval, joka ohjasi haamujen liikettä aiemmalla nopeudella
+    clearInterval(ghostInterval);
+
+
+    // Käynnistetään uusi setInterval 1 sekunnin kuluttua
+    setTimeout(() => {
+        ghostInterval = setInterval(moveGhosts, ghostSpeed);
+    }, 1000); // 1000 ms = 1 sekunti
 }
 
